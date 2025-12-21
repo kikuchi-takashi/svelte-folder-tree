@@ -25,6 +25,7 @@ interface TreeState {
   nodes: TreeNode[];
   activeNodeId: string | null;
   isLoading: boolean;
+  draggingNodeId: string | null;
 }
 
 // Helper to get children safely
@@ -37,6 +38,7 @@ const { subscribe, update, set } = writable<TreeState>({
   nodes: [],
   activeNodeId: null,
   isLoading: false,
+  draggingNodeId: null,
 });
 
 const generateId = (): string => Math.random().toString(36).substr(2, 9);
@@ -169,11 +171,21 @@ export const treeStore = {
 
   // Initialize with data from server
   initialize: (nodes: TreeNode[]) => {
-    set({ nodes, activeNodeId: null, isLoading: false });
+    set({ nodes, activeNodeId: null, isLoading: false, draggingNodeId: null });
   },
 
   setActive: (id: string | null) =>
     update((state) => ({ ...state, activeNodeId: id })),
+
+  // Drag state management
+  setDragging: (id: string | null) =>
+    update((state) => ({ ...state, draggingNodeId: id })),
+
+  clearDragging: () => update((state) => ({ ...state, draggingNodeId: null })),
+
+  getDraggingId: (): string | null => {
+    return get({ subscribe }).draggingNodeId;
+  },
 
   toggleExpand: (id: string) => {
     update((state) => {
@@ -320,30 +332,57 @@ export const treeStore = {
     }
   },
 
-  moveNode: (nodeId: string, targetParentId: string | null) => {
-    update((state) => {
-      const nodeCopy = findNode(state.nodes, nodeId);
-      if (!nodeCopy) return state;
+  // Check if moving a node would cause a name conflict
+  checkMoveConflict: (
+    nodeId: string,
+    targetParentId: string | null
+  ): string | null => {
+    const state = get({ subscribe });
+    const node = findNode(state.nodes, nodeId);
+    if (!node) return null;
 
-      // Prevent moving into itself or descendants
-      if (targetParentId) {
-        let checkNode: TreeNode | null = findNode(state.nodes, targetParentId);
-        while (checkNode) {
-          if (checkNode.id === nodeId) return state;
-          checkNode = findParent(state.nodes, checkNode.id);
-        }
+    const targetChildren = getChildrenOfParent(state.nodes, targetParentId);
+    const conflict = targetChildren.find(
+      (c) => c.id !== nodeId && c.name.toLowerCase() === node.name.toLowerCase()
+    );
+
+    return conflict ? conflict.name : null;
+  },
+
+  moveNode: (nodeId: string, targetParentId: string | null): boolean => {
+    const state = get({ subscribe });
+    const nodeCopy = findNode(state.nodes, nodeId);
+    if (!nodeCopy) return false;
+
+    // Prevent moving into itself or descendants
+    if (targetParentId) {
+      let checkNode: TreeNode | null = findNode(state.nodes, targetParentId);
+      while (checkNode) {
+        if (checkNode.id === nodeId) return false;
+        checkNode = findParent(state.nodes, checkNode.id);
       }
+    }
 
-      const currentParent = findParent(state.nodes, nodeId);
-      if ((currentParent?.id || null) === targetParentId) return state;
+    const currentParent = findParent(state.nodes, nodeId);
+    if ((currentParent?.id || null) === targetParentId) return false;
 
-      let newNodes = removeNode(state.nodes, nodeId);
+    // Check for name conflict
+    const targetChildren = getChildrenOfParent(state.nodes, targetParentId);
+    const hasConflict = targetChildren.some(
+      (c) =>
+        c.id !== nodeId && c.name.toLowerCase() === nodeCopy.name.toLowerCase()
+    );
+    if (hasConflict) return false;
+
+    update((s) => {
+      let newNodes = removeNode(s.nodes, nodeId);
       newNodes = targetParentId
         ? addNodeToParent(newNodes, targetParentId, { ...nodeCopy })
         : [...newNodes, { ...nodeCopy }];
-
-      return { ...state, nodes: newNodes };
+      return { ...s, nodes: newNodes };
     });
+
+    return true;
   },
 
   getActiveFolder: (state: TreeState): string | null => {
@@ -362,6 +401,30 @@ export const treeStore = {
     if (isFolder(node)) return node.id;
     const parent = findParent(state.nodes, nodeId);
     return parent?.id || null;
+  },
+
+  // Get the containing folder ID for any node (returns parent folder ID, not self)
+  getContainingFolderId: (nodeId: string): string | null => {
+    const state = get({ subscribe });
+    const parent = findParent(state.nodes, nodeId);
+    return parent?.id || null;
+  },
+
+  // Check if targetId is a descendant of ancestorId
+  isDescendantOf: (targetId: string, ancestorId: string): boolean => {
+    const state = get({ subscribe });
+    const ancestor = findNode(state.nodes, ancestorId);
+    if (!ancestor || !isFolder(ancestor)) return false;
+
+    const checkDescendants = (nodes: TreeNode[]): boolean => {
+      for (const node of nodes) {
+        if (node.id === targetId) return true;
+        if (isFolder(node) && checkDescendants(node.children)) return true;
+      }
+      return false;
+    };
+
+    return checkDescendants(ancestor.children);
   },
 };
 

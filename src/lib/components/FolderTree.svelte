@@ -8,7 +8,7 @@
   let fileInput: HTMLInputElement;
 
   function getParentId(): string | null {
-    const state = { nodes: [], activeNodeId: $activeNodeId, isLoading: false };
+    const state = { nodes: [], activeNodeId: $activeNodeId, isLoading: false, draggingNodeId: null };
     treeStore.subscribe(s => Object.assign(state, s))();
     return treeStore.getActiveFolder(state);
   }

@@ -111,12 +111,43 @@
     if (isDisabled) return;
     e.dataTransfer?.setData('text/plain', node.id);
     e.dataTransfer!.effectAllowed = 'move';
+    // Track dragging state globally for descendant check during dragover
+    treeStore.setDragging(node.id);
+  }
+
+  function handleDragEnd() {
+    treeStore.clearDragging();
   }
 
   function handleDragOver(e: DragEvent) {
     if (isDisabled) return;
     e.preventDefault();
     e.stopPropagation();
+
+    // Get dragged item ID from store (getData doesn't work during dragover)
+    const draggedId = treeStore.getDraggingId();
+    
+    if (draggedId) {
+      // Don't show drop target visual if:
+      // 1. Dragging over self
+      // 2. This node is a descendant of the dragged item
+      // 3. This is the same parent folder (no-op move)
+      // 4. Dragging a file over a sibling file (target would be same parent)
+      if (draggedId === node.id || treeStore.isDescendantOf(node.id, draggedId)) {
+        e.dataTransfer!.dropEffect = 'none';
+        return;
+      }
+
+      // Get where the item would be dropped
+      const targetFolderId = nodeIsFolder ? node.id : treeStore.getParentFolderId(node.id);
+      const draggedParentId = treeStore.getContainingFolderId(draggedId);
+      
+      // If dropping into the same folder, it's a no-op - don't highlight
+      if (targetFolderId === draggedParentId) {
+        e.dataTransfer!.dropEffect = 'none';
+        return;
+      }
+    }
     
     if (!isDragOver) {
       isDragOver = true;
@@ -150,6 +181,14 @@
     if (!draggedId || draggedId === node.id) return;
 
     const targetFolderId = treeStore.getParentFolderId(node.id);
+    
+    // Check for name conflict before moving
+    const conflictName = treeStore.checkMoveConflict(draggedId, targetFolderId);
+    if (conflictName) {
+      alert(`移動先に同じ名前のファイルまたはフォルダ「${conflictName}」が既に存在します。`);
+      return;
+    }
+    
     if (draggedId !== targetFolderId) treeStore.moveNode(draggedId, targetFolderId);
   }
 
@@ -180,6 +219,7 @@
       on:dblclick={handleDoubleClick}
       on:keydown={e => e.key === 'Enter' && handleClick()}
       on:dragstart={handleDragStart}
+      on:dragend={handleDragEnd}
       on:dragover={handleDragOver}
       on:dragleave={handleDragLeave}
       on:drop={handleDrop}
