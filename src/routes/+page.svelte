@@ -1,5 +1,13 @@
 <script lang="ts">
   import FolderTree from '$lib/components/FolderTree.svelte';
+  import { treeStore } from '$lib/stores/treeStore';
+
+  export let data;
+
+  // Initialize store with server data immediately (not in onMount)
+  $: if (data.treeData) {
+    treeStore.initialize(data.treeData);
+  }
 </script>
 
 <svelte:head>
