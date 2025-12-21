@@ -16,7 +16,9 @@
   async function handleFileSelected(e: Event) {
     const input = e.target as HTMLInputElement;
     const files = input.files;
-    if (!files?.length) return;
+    if (!files?.length) {
+      return;
+    }
 
     const parentId = getParentId();
     for (const file of Array.from(files)) {
@@ -41,7 +43,9 @@
 
   function handleDragLeave(e: DragEvent) {
     const target = e.currentTarget as HTMLElement;
-    if (!target.contains(e.relatedTarget as HTMLElement)) isDragOverExternal = false;
+    if (!target.contains(e.relatedTarget as HTMLElement)) {
+      isDragOverExternal = false;
+    }
   }
 
   async function processEntry(entry: FileSystemEntry, parentId: string | null): Promise<void> {
@@ -77,10 +81,14 @@
   function findNodeByName(nodes: TreeNode[], parentId: string | null, name: string): TreeNode | null {
     const searchInner = (items: TreeNode[]): TreeNode | null => {
       for (const item of items) {
-        if (item.name === name) return item;
+        if (item.name === name) {
+          return item;
+        }
         if (item.type === 'folder' && item.children) {
           const found = searchInner(item.children);
-          if (found) return found;
+          if (found) {
+            return found;
+          }
         }
       }
       return null;
@@ -92,10 +100,14 @@
     
     const findParent = (items: TreeNode[]): TreeNode[] | null => {
       for (const item of items) {
-        if (item.id === parentId && item.type === 'folder') return item.children;
+        if (item.id === parentId && item.type === 'folder') {
+          return item.children;
+        }
         if (item.type === 'folder' && item.children) {
           const found = findParent(item.children);
-          if (found) return found;
+          if (found) {
+            return found;
+          }
         }
       }
       return null;
@@ -124,7 +136,9 @@
       return;
     }
 
-    if (!files?.length) return;
+    if (!files?.length) {
+      return;
+    }
 
     for (const file of Array.from(files)) {
       const uniqueName = treeStore.getUniqueFileName(parentId, file.name);

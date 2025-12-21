@@ -45,10 +45,14 @@ const generateId = (): string => Math.random().toString(36).substr(2, 9);
 
 const findNode = (nodes: TreeNode[], id: string): TreeNode | null => {
   for (const node of nodes) {
-    if (node.id === id) return node;
+    if (node.id === id) {
+      return node;
+    }
     if (isFolder(node)) {
       const found = findNode(node.children, id);
-      if (found) return found;
+      if (found) {
+        return found;
+      }
     }
   }
   return null;
@@ -60,11 +64,17 @@ const findParent = (
   parent: TreeNode | null = null
 ): TreeNode | null => {
   for (const node of nodes) {
-    if (node.id === id) return parent;
+    if (node.id === id) {
+      return parent;
+    }
     if (isFolder(node)) {
       const found = findParent(node.children, id, node);
-      if (found) return found;
-      if (node.children.some((c) => c.id === id)) return node;
+      if (found) {
+        return found;
+      }
+      if (node.children.some((c) => c.id === id)) {
+        return node;
+      }
     }
   }
   return null;
@@ -72,7 +82,9 @@ const findParent = (
 
 const getSiblings = (nodes: TreeNode[], id: string): TreeNode[] => {
   const rootNode = nodes.find((n) => n.id === id);
-  if (rootNode) return nodes.filter((n) => n.id !== id);
+  if (rootNode) {
+    return nodes.filter((n) => n.id !== id);
+  }
 
   for (const node of nodes) {
     if (isFolder(node)) {
@@ -80,7 +92,9 @@ const getSiblings = (nodes: TreeNode[], id: string): TreeNode[] => {
         return node.children.filter((c) => c.id !== id);
       }
       const found = getSiblings(node.children, id);
-      if (found.length > 0) return found;
+      if (found.length > 0) {
+        return found;
+      }
     }
   }
   return [];
@@ -97,7 +111,9 @@ const getChildrenOfParent = (
 
 const removeNode = (nodes: TreeNode[], id: string): TreeNode[] => {
   return nodes.filter((node) => {
-    if (node.id === id) return false;
+    if (node.id === id) {
+      return false;
+    }
     if (isFolder(node)) {
       (node as FolderItem).children = removeNode(node.children, id);
     }
@@ -190,7 +206,9 @@ export const treeStore = {
   toggleExpand: (id: string) => {
     update((state) => {
       const node = findNode(state.nodes, id);
-      if (!node || !isFolder(node)) return state;
+      if (!node || !isFolder(node)) {
+        return state;
+      }
       return {
         ...state,
         nodes: setNodeExpanded(state.nodes, id, !node.expanded),
@@ -219,8 +237,11 @@ export const treeStore = {
     const state = get({ subscribe });
     const children = getChildrenOfParent(state.nodes, parentId);
 
-    if (!children.some((c) => c.name.toLowerCase() === baseName.toLowerCase()))
+    if (
+      !children.some((c) => c.name.toLowerCase() === baseName.toLowerCase())
+    ) {
       return baseName;
+    }
 
     let counter = 1;
     let newName = `${baseName}(${counter})`;
@@ -237,8 +258,11 @@ export const treeStore = {
     const state = get({ subscribe });
     const children = getChildrenOfParent(state.nodes, parentId);
 
-    if (!children.some((c) => c.name.toLowerCase() === fileName.toLowerCase()))
+    if (
+      !children.some((c) => c.name.toLowerCase() === fileName.toLowerCase())
+    ) {
       return fileName;
+    }
 
     const lastDot = fileName.lastIndexOf('.');
     const baseName = lastDot > 0 ? fileName.substring(0, lastDot) : fileName;
@@ -339,7 +363,9 @@ export const treeStore = {
   ): string | null => {
     const state = get({ subscribe });
     const node = findNode(state.nodes, nodeId);
-    if (!node) return null;
+    if (!node) {
+      return null;
+    }
 
     const targetChildren = getChildrenOfParent(state.nodes, targetParentId);
     const conflict = targetChildren.find(
@@ -352,19 +378,25 @@ export const treeStore = {
   moveNode: (nodeId: string, targetParentId: string | null): boolean => {
     const state = get({ subscribe });
     const nodeCopy = findNode(state.nodes, nodeId);
-    if (!nodeCopy) return false;
+    if (!nodeCopy) {
+      return false;
+    }
 
     // Prevent moving into itself or descendants
     if (targetParentId) {
       let checkNode: TreeNode | null = findNode(state.nodes, targetParentId);
       while (checkNode) {
-        if (checkNode.id === nodeId) return false;
+        if (checkNode.id === nodeId) {
+          return false;
+        }
         checkNode = findParent(state.nodes, checkNode.id);
       }
     }
 
     const currentParent = findParent(state.nodes, nodeId);
-    if ((currentParent?.id || null) === targetParentId) return false;
+    if ((currentParent?.id || null) === targetParentId) {
+      return false;
+    }
 
     // Check for name conflict
     const targetChildren = getChildrenOfParent(state.nodes, targetParentId);
@@ -372,7 +404,9 @@ export const treeStore = {
       (c) =>
         c.id !== nodeId && c.name.toLowerCase() === nodeCopy.name.toLowerCase()
     );
-    if (hasConflict) return false;
+    if (hasConflict) {
+      return false;
+    }
 
     update((s) => {
       let newNodes = removeNode(s.nodes, nodeId);
@@ -386,10 +420,16 @@ export const treeStore = {
   },
 
   getActiveFolder: (state: TreeState): string | null => {
-    if (!state.activeNodeId) return null;
+    if (!state.activeNodeId) {
+      return null;
+    }
     const node = findNode(state.nodes, state.activeNodeId);
-    if (!node) return null;
-    if (isFolder(node)) return node.id;
+    if (!node) {
+      return null;
+    }
+    if (isFolder(node)) {
+      return node.id;
+    }
     const parent = findParent(state.nodes, state.activeNodeId);
     return parent?.id || null;
   },
@@ -397,8 +437,12 @@ export const treeStore = {
   getParentFolderId: (nodeId: string): string | null => {
     const state = get({ subscribe });
     const node = findNode(state.nodes, nodeId);
-    if (!node) return null;
-    if (isFolder(node)) return node.id;
+    if (!node) {
+      return null;
+    }
+    if (isFolder(node)) {
+      return node.id;
+    }
     const parent = findParent(state.nodes, nodeId);
     return parent?.id || null;
   },
@@ -414,12 +458,18 @@ export const treeStore = {
   isDescendantOf: (targetId: string, ancestorId: string): boolean => {
     const state = get({ subscribe });
     const ancestor = findNode(state.nodes, ancestorId);
-    if (!ancestor || !isFolder(ancestor)) return false;
+    if (!ancestor || !isFolder(ancestor)) {
+      return false;
+    }
 
     const checkDescendants = (nodes: TreeNode[]): boolean => {
       for (const node of nodes) {
-        if (node.id === targetId) return true;
-        if (isFolder(node) && checkDescendants(node.children)) return true;
+        if (node.id === targetId) {
+          return true;
+        }
+        if (isFolder(node) && checkDescendants(node.children)) {
+          return true;
+        }
       }
       return false;
     };

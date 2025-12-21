@@ -29,13 +29,19 @@
   $: nodeChildren = nodeIsFolder ? node.children : [];
 
   function handleClick() {
-    if (isDisabled) return;
+    if (isDisabled) {
+      return;
+    }
     treeStore.setActive(node.id);
-    if (nodeIsFolder) treeStore.toggleExpand(node.id);
+    if (nodeIsFolder) {
+      treeStore.toggleExpand(node.id);
+    }
   }
 
   function handleDoubleClick() {
-    if (isDisabled) return;
+    if (isDisabled) {
+      return;
+    }
     isEditing = true;
     editName = node.name;
     errorMessage = '';
@@ -44,7 +50,9 @@
 
   function handleRename() {
     // Prevent double execution
-    if (!isEditing) return;
+    if (!isEditing) {
+      return;
+    }
 
     const trimmedName = editName.trim();
     
@@ -97,7 +105,9 @@
   }
 
   function handleInput() {
-    if (errorMessage) errorMessage = '';
+    if (errorMessage) {
+      errorMessage = '';
+    }
   }
 
   function handleBlur() {
@@ -108,7 +118,9 @@
   }
 
   function handleDragStart(e: DragEvent) {
-    if (isDisabled) return;
+    if (isDisabled) {
+      return;
+    }
     e.dataTransfer?.setData('text/plain', node.id);
     e.dataTransfer!.effectAllowed = 'move';
     // Track dragging state globally for descendant check during dragover
@@ -120,7 +132,9 @@
   }
 
   function handleDragOver(e: DragEvent) {
-    if (isDisabled) return;
+    if (isDisabled) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
 
@@ -164,8 +178,13 @@
   function handleDragLeave(e: DragEvent) {
     e.stopPropagation();
     isDragOver = false;
-    if (!nodeIsFolder) dispatch('dragOverParent', { isDragOver: false });
-    if (hoverExpandTimer) { clearTimeout(hoverExpandTimer); hoverExpandTimer = null; }
+    if (!nodeIsFolder) {
+      dispatch('dragOverParent', { isDragOver: false });
+    }
+    if (hoverExpandTimer) {
+      clearTimeout(hoverExpandTimer);
+      hoverExpandTimer = null;
+    }
   }
 
   function handleDrop(e: DragEvent) {
@@ -173,12 +192,21 @@
     e.stopPropagation();
     isDragOver = false;
     childDragOver = false;
-    if (!nodeIsFolder) dispatch('dragOverParent', { isDragOver: false });
-    if (hoverExpandTimer) { clearTimeout(hoverExpandTimer); hoverExpandTimer = null; }
-    if (isDisabled) return;
+    if (!nodeIsFolder) {
+      dispatch('dragOverParent', { isDragOver: false });
+    }
+    if (hoverExpandTimer) {
+      clearTimeout(hoverExpandTimer);
+      hoverExpandTimer = null;
+    }
+    if (isDisabled) {
+      return;
+    }
 
     const draggedId = e.dataTransfer?.getData('text/plain');
-    if (!draggedId || draggedId === node.id) return;
+    if (!draggedId || draggedId === node.id) {
+      return;
+    }
 
     const targetFolderId = treeStore.getParentFolderId(node.id);
     
@@ -189,7 +217,9 @@
       return;
     }
     
-    if (draggedId !== targetFolderId) treeStore.moveNode(draggedId, targetFolderId);
+    if (draggedId !== targetFolderId) {
+      treeStore.moveNode(draggedId, targetFolderId);
+    }
   }
 
   function handleChildDragOver(e: CustomEvent<{ isDragOver: boolean }>) {
@@ -198,10 +228,16 @@
 
   function handleExpandClick(e: MouseEvent) {
     e.stopPropagation();
-    if (nodeIsFolder) treeStore.toggleExpand(node.id);
+    if (nodeIsFolder) {
+      treeStore.toggleExpand(node.id);
+    }
   }
 
-  onDestroy(() => { if (hoverExpandTimer) clearTimeout(hoverExpandTimer); });
+  onDestroy(() => {
+    if (hoverExpandTimer) {
+      clearTimeout(hoverExpandTimer);
+    }
+  });
 </script>
 
 <div class="select-none">
