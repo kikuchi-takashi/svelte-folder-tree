@@ -187,7 +187,7 @@
     }
   }
 
-  function handleDrop(e: DragEvent) {
+  async function handleDrop(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     isDragOver = false;
@@ -203,7 +203,48 @@
       return;
     }
 
+    // Check if this is an external file drop (from Finder)
+    const hasExternalFiles = e.dataTransfer?.types.includes('Files');
     const draggedId = e.dataTransfer?.getData('text/plain');
+    
+    // If it's an external file drop (no internal draggedId but has Files)
+    if (hasExternalFiles && !draggedId) {
+      // Process external files directly into this folder (or parent folder for files)
+      const targetFolderId = nodeIsFolder ? node.id : treeStore.getContainingFolderId(node.id);
+      const items = e.dataTransfer?.items;
+      const files = e.dataTransfer?.files;
+      
+      // Expand folder when dropping into it
+      if (nodeIsFolder && !nodeExpanded) {
+        treeStore.setExpanded(node.id, true);
+      }
+      
+      // Try webkitGetAsEntry first (supports folders from Finder)
+      let processedCount = 0;
+      if (items && items.length > 0) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (typeof item.webkitGetAsEntry === 'function') {
+            const entry = item.webkitGetAsEntry();
+            if (entry) {
+              await processExternalEntry(entry, targetFolderId);
+              processedCount++;
+            }
+          }
+        }
+      }
+      
+      // Fallback to files if webkitGetAsEntry didn't work
+      if (processedCount === 0 && files && files.length > 0) {
+        for (const file of Array.from(files)) {
+          const uniqueName = treeStore.getUniqueFileName(targetFolderId, file.name);
+          await treeStore.addFile(uniqueName, targetFolderId || undefined);
+        }
+      }
+      return;
+    }
+
+    // Internal drag and drop
     if (!draggedId || draggedId === node.id) {
       return;
     }
@@ -219,6 +260,39 @@
     
     if (draggedId !== targetFolderId) {
       treeStore.moveNode(draggedId, targetFolderId);
+    }
+  }
+  
+  async function processExternalEntry(entry: FileSystemEntry, parentId: string | null): Promise<void> {
+    try {
+      if (entry.isFile) {
+        const fileEntry = entry as FileSystemFileEntry;
+        const file = await new Promise<File>((resolve, reject) => {
+          fileEntry.file(resolve, reject);
+        });
+        const uniqueName = treeStore.getUniqueFileName(parentId, file.name);
+        await treeStore.addFile(uniqueName, parentId || undefined);
+      } else if (entry.isDirectory) {
+        const dirEntry = entry as FileSystemDirectoryEntry;
+        const folderName = treeStore.getUniqueFolderName(parentId, entry.name);
+        
+        await treeStore.addFolder(folderName, parentId || undefined);
+        
+        // Find the newly created folder
+        const newFolder = treeStore.findNodeByNameInParent(parentId, folderName);
+        const newFolderId = newFolder?.id || null;
+
+        const reader = dirEntry.createReader();
+        const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => {
+          reader.readEntries(resolve, reject);
+        });
+
+        for (const childEntry of entries) {
+          await processExternalEntry(childEntry, newFolderId);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to process entry:', error);
     }
   }
 

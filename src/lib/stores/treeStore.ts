@@ -476,6 +476,22 @@ export const treeStore = {
 
     return checkDescendants(ancestor.children);
   },
+
+  // Find a node by name within a specific parent folder
+  findNodeByNameInParent: (
+    parentId: string | null,
+    name: string
+  ): TreeNode | null => {
+    const state = get({ subscribe });
+    if (parentId === null) {
+      return state.nodes.find((n) => n.name === name) || null;
+    }
+    const parent = findNode(state.nodes, parentId);
+    if (parent && isFolder(parent)) {
+      return parent.children.find((c) => c.name === name) || null;
+    }
+    return null;
+  },
 };
 
 export const isLoading = derived(treeStore, ($state) => $state.isLoading);

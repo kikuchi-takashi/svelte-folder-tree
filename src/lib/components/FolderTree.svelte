@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { TreeNode } from '$lib/stores/treeStore';
   import { activeNodeId, isLoading, treeStore } from '$lib/stores/treeStore';
   import Icon from './Icon.svelte';
   import TreeItem from './TreeItem.svelte';
@@ -43,106 +42,81 @@
 
   function handleDragLeave(e: DragEvent) {
     const target = e.currentTarget as HTMLElement;
-    if (!target.contains(e.relatedTarget as HTMLElement)) {
+    const related = e.relatedTarget as HTMLElement | null;
+    // Reset when leaving the container entirely (relatedTarget is null or outside container)
+    if (!related || !target.contains(related)) {
       isDragOverExternal = false;
     }
   }
 
-  async function processEntry(entry: FileSystemEntry, parentId: string | null): Promise<void> {
-    if (entry.isFile) {
-      const fileEntry = entry as FileSystemFileEntry;
-      const file = await new Promise<File>((resolve, reject) => {
-        fileEntry.file(resolve, reject);
-      });
-      const uniqueName = treeStore.getUniqueFileName(parentId, file.name);
-      await treeStore.addFile(uniqueName, parentId || undefined);
-    } else if (entry.isDirectory) {
-      const dirEntry = entry as FileSystemDirectoryEntry;
-      const folderName = treeStore.getUniqueFolderName(parentId, entry.name);
-      
-      await treeStore.addFolder(folderName, parentId || undefined);
-      
-      const state = { nodes: [], activeNodeId: null, isLoading: false };
-      treeStore.subscribe(s => Object.assign(state, s))();
-      const newFolder = findNodeByName(state.nodes, parentId, folderName);
-      const newFolderId = newFolder?.id || null;
-
-      const reader = dirEntry.createReader();
-      const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => {
-        reader.readEntries(resolve, reject);
-      });
-
-      for (const childEntry of entries) {
-        await processEntry(childEntry, newFolderId);
-      }
-    }
+  function handleDragEnd() {
+    isDragOverExternal = false;
   }
 
-  function findNodeByName(nodes: TreeNode[], parentId: string | null, name: string): TreeNode | null {
-    const searchInner = (items: TreeNode[]): TreeNode | null => {
-      for (const item of items) {
-        if (item.name === name) {
-          return item;
-        }
-        if (item.type === 'folder' && item.children) {
-          const found = searchInner(item.children);
-          if (found) {
-            return found;
-          }
+  async function processEntry(entry: FileSystemEntry, parentId: string | null): Promise<void> {
+    try {
+      if (entry.isFile) {
+        const fileEntry = entry as FileSystemFileEntry;
+        const file = await new Promise<File>((resolve, reject) => {
+          fileEntry.file(resolve, reject);
+        });
+        const uniqueName = treeStore.getUniqueFileName(parentId, file.name);
+        await treeStore.addFile(uniqueName, parentId || undefined);
+      } else if (entry.isDirectory) {
+        const dirEntry = entry as FileSystemDirectoryEntry;
+        const folderName = treeStore.getUniqueFolderName(parentId, entry.name);
+        
+        await treeStore.addFolder(folderName, parentId || undefined);
+        
+        const newFolder = treeStore.findNodeByNameInParent(parentId, folderName);
+        const newFolderId = newFolder?.id || null;
+
+        const reader = dirEntry.createReader();
+        const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => {
+          reader.readEntries(resolve, reject);
+        });
+
+        for (const childEntry of entries) {
+          await processEntry(childEntry, newFolderId);
         }
       }
-      return null;
-    };
-    
-    if (parentId === null) {
-      return nodes.find(n => n.name === name) || null;
+    } catch (error) {
+      console.error('Failed to process entry:', error);
     }
-    
-    const findParent = (items: TreeNode[]): TreeNode[] | null => {
-      for (const item of items) {
-        if (item.id === parentId && item.type === 'folder') {
-          return item.children;
-        }
-        if (item.type === 'folder' && item.children) {
-          const found = findParent(item.children);
-          if (found) {
-            return found;
-          }
-        }
-      }
-      return null;
-    };
-    
-    const children = findParent(nodes);
-    return children?.find(n => n.name === name) || null;
   }
 
   async function handleDrop(e: DragEvent) {
     e.preventDefault();
     isDragOverExternal = false;
 
-    const items = e.dataTransfer?.items;
-    const files = e.dataTransfer?.files;
-    
-    const parentId = getParentId();
+    try {
+      const items = e.dataTransfer?.items;
+      const files = e.dataTransfer?.files;
+      const parentId = getParentId();
 
-    if (items && items.length > 0 && !!items[0].webkitGetAsEntry) {
-      for (let i = 0; i < items.length; i++) {
-        const entry = items[i].webkitGetAsEntry();
-        if (entry) {
-          await processEntry(entry, parentId);
+      // Try webkitGetAsEntry first (supports folders from Finder)
+      let processedCount = 0;
+      if (items && items.length > 0) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          // Check if webkitGetAsEntry is available on this item
+          const entry = item.webkitGetAsEntry();
+          if (entry) {
+            await processEntry(entry, parentId);
+            processedCount++;
+          }
         }
       }
-      return;
-    }
 
-    if (!files?.length) {
-      return;
-    }
-
-    for (const file of Array.from(files)) {
-      const uniqueName = treeStore.getUniqueFileName(parentId, file.name);
-      await treeStore.addFile(uniqueName, parentId || undefined);
+      // If webkitGetAsEntry didn't process anything, fall back to files
+      if (processedCount === 0 && files && files.length > 0) {
+        for (const file of Array.from(files)) {
+          const uniqueName = treeStore.getUniqueFileName(parentId, file.name);
+          await treeStore.addFile(uniqueName, parentId || undefined);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to handle drop:', error);
     }
   }
 </script>
@@ -156,6 +130,7 @@
   tabindex="0"
   on:dragover={handleDragOver} 
   on:dragleave={handleDragLeave} 
+  on:dragend={handleDragEnd}
   on:drop={handleDrop}
 >
   <!-- Header -->
